@@ -60,22 +60,38 @@ def _copy_dir(target_dir, entry, on_duplicate, keep_top_dir):
             # on_duplicate == 'ignore': do nothing with e2
 
 
+def _get_marks(node):
+    """
+    get a list of 'datafiles' marks for a given node for compatibility with
+    different pytest versions
+    """
+    if hasattr(node, "iter_markers"):
+        return node.iter_markers('datafiles')
+    else:
+        mark = node.get_marker('datafiles')
+        return [] if mark is None else [mark]
+
+
 @pytest.fixture
 def datafiles(request, tmpdir):
     """
     pytest fixture to define a 'tmpdir' containing files or directories
     specified with a 'datafiles' mark.
     """
-    if 'datafiles' not in request.keywords:
-        return tmpdir
-    content = request.keywords.get('datafiles').args
+    content = []
     options = {
         'keep_top_dir': False,
         'on_duplicate': 'exception',  # ignore, overwrite
         }
-    options.update(request.keywords.get('datafiles').kwargs)
+    for mark in _get_marks(request.node):
+        content.extend(mark.args)
+        options.update(mark.kwargs)
     on_duplicate = options['on_duplicate']
     keep_top_dir = options['keep_top_dir']
+
+    if not content:
+        return tmpdir
+
     if keep_top_dir not in (True, False):
         raise ValueError("'keep_top_dir' must be True or False")
     if on_duplicate not in ('exception', 'ignore', 'overwrite'):
